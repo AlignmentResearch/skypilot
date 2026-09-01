@@ -380,6 +380,8 @@ def _ray_gpu_options(custom_resource: str) -> str:
 # vanish when unset, so non-hostNetwork bootstraps defer to Ray's own
 # defaults. Kept in one place so the head/worker flag sets can't drift.
 _SHARED_RAY_PORT_FLAGS = (
+    # --- nemo-rl: pin system Ray to the Kubernetes pod IP ---
+    '${SKYPILOT_RAY_NODE_IP:+--node-ip-address=$SKYPILOT_RAY_NODE_IP} '
     '--object-manager-port=${SKYPILOT_RAY_OBJECT_MANAGER_PORT:-8076} '
     '${SKYPILOT_RAY_NODE_MANAGER_PORT:+'
     '--node-manager-port=$SKYPILOT_RAY_NODE_MANAGER_PORT} '
