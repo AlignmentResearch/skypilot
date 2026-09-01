@@ -394,9 +394,10 @@ class CommandRunner:
         ] if use_login else ['/bin/bash', '-c']
         if source_bashrc:
             command += [
-                # Need this `-i` option to make sure `source ~/.bashrc` work.
-                # Sourcing bashrc may take a few seconds causing overheads.
-                '-i',
+                # --- nemo-rl: no interactive shell (login banners pollute output) ---
+                # `-i` removed: it makes /etc/profile emit /etc/profile.d output, which on
+                # sites with a login banner lands in the output SkyPilot parses. `--login`
+                # still supplies /etc/profile.
                 shlex.quote(
                     f'true && source ~/.bashrc && export OMP_NUM_THREADS=1 '
                     f'PYTHONWARNINGS=ignore && ({cmd})'),
