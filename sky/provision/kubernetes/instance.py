@@ -1304,10 +1304,11 @@ def _wait_for_deployment_pod(context,
     deployment_name = deployment.metadata.name
     start_time = time.time()
     while time.time() - start_time < timeout:
-        # Refresh the deployment status
-        deployment = kubernetes.apps_api(
-            context).read_namespaced_deployment_status(deployment_name,
-                                                       namespace)
+        # --- nemo-rl: read HA Deployment status through ordinary Deployment RBAC ---
+        # An ordinary Deployment GET includes `.status` and avoids requiring a
+        # separate deployments/status RBAC grant.
+        deployment = kubernetes.apps_api(context).read_namespaced_deployment(
+            deployment_name, namespace)
         if (deployment.status and
                 deployment.status.ready_replicas is not None and
                 deployment.status.ready_replicas >= target_replicas):
