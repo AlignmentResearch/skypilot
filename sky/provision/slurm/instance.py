@@ -257,6 +257,26 @@ def _wait_for_job_nodes(
                        f'{timeout} seconds. Last state: {last_state}')
 
 
+# --- nemo-rl: retry transient empty node results after allocation ---
+def _get_job_nodes_with_retry(
+    client: 'slurm.SlurmClient',
+    job_id: str,
+) -> Tuple[List[str], List[str]]:
+    max_attempts = 6
+    for attempt in range(1, max_attempts):
+        try:
+            return client.get_job_nodes(job_id)
+        except RuntimeError as e:
+            if not str(e).startswith(f'No nodes found for job {job_id}.'):
+                raise
+            logger.warning(f'Transient error getting nodes for Slurm job {job_id}; '
+                           f'retrying after allocation (attempt {attempt}/'
+                           f'{max_attempts}): {e}')
+            time.sleep(POLL_INTERVAL_SECONDS)
+    # Let the final exception propagate without another warning or sleep.
+    return client.get_job_nodes(job_id)
+
+
 def _sky_cluster_home_dir(base_dir: str, cluster_name_on_cloud: str) -> str:
     """Returns the SkyPilot cluster's home directory path on the Slurm cluster.
 
@@ -446,7 +466,8 @@ def _create_virtual_instance(
         # Wait for nodes to be allocated (job might be in PENDING state)
         _wait_for_job_nodes(client, job_id, provision_timeout, partition,
                             _on_pending)
-        nodes, _ = client.get_job_nodes(job_id)
+        # --- nemo-rl: retry node lookup for an existing allocation ---
+        nodes, _ = _get_job_nodes_with_retry(client, job_id)
         # Reset spinner since nodes are now allocated
         rich_utils.force_update_status(
             ux_utils.spinner_message('Launching', cluster_name=cluster_name))
@@ -730,7 +751,8 @@ touch {sky_cluster_home_dir}/.hushlogin
 
     _wait_for_job_nodes(client, job_id, provision_timeout, partition,
                         _on_pending)
-    nodes, _ = client.get_job_nodes(job_id)
+    # --- nemo-rl: retry node lookup for a new allocation ---
+    nodes, _ = _get_job_nodes_with_retry(client, job_id)
     # Reset spinner since nodes are now allocated
     rich_utils.force_update_status(
         ux_utils.spinner_message('Launching', cluster_name=cluster_name))
