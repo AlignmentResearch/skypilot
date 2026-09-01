@@ -1303,7 +1303,8 @@ def _wait_for_deployment_pod(context,
     target_replicas = deployment.spec.replicas
     deployment_name = deployment.metadata.name
     start_time = time.time()
-    while time.time() - start_time < timeout:
+    # --- nemo-rl: honor provision_timeout for HA Deployment readiness ---
+    while timeout < 0 or time.time() - start_time < timeout:
         # --- nemo-rl: read HA Deployment status through ordinary Deployment RBAC ---
         # An ordinary Deployment GET includes `.status` and avoids requiring a
         # separate deployments/status RBAC grant.
@@ -1704,9 +1705,12 @@ def _create_pods(region: str, cluster_name: str, cluster_name_on_cloud: str,
 
     if to_create_deployment:
         deployments = copy.deepcopy(created_resources)
+        # --- nemo-rl: pass provision_timeout to HA Deployment readiness ---
+        deployment_timeout = provider_config['timeout']
         pods = [
             pod for deployment in deployments
-            for pod in _wait_for_deployment_pod(context, namespace, deployment)
+            for pod in _wait_for_deployment_pod(
+                context, namespace, deployment, timeout=deployment_timeout)
         ]
     else:
         # If not creating deployments, 'created_resources' already holds Pod objects
