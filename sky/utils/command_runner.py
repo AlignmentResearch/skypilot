@@ -264,7 +264,19 @@ def ssh_options_list(
     if (ssh_control_name is not None and docker_ssh_proxy_command is None and
             ssh_proxy_command is None and ssh_proxy_jump is None and
             not disable_control_master):
-        control_path = f'{_ssh_control_path(ssh_control_name)}/%C'
+        # --- nemo-rl: external ControlMaster support ---
+        # An externally-managed ControlMaster, when the operator asks for one.
+        # Sites that force an interactive second factor on every connection
+        # cannot use a SkyPilot-private control path: it is keyed by %C under a
+        # private directory, so it can never attach to a master the user opened
+        # with plain `ssh`. Given a template, one hand-authenticated master
+        # serves every SkyPilot connection.
+        _external_control_path = os.environ.get('SKYPILOT_SSH_CONTROL_PATH')
+        _control_persist = os.environ.get('SKYPILOT_SSH_CONTROL_PERSIST', '300s')
+        if _external_control_path:
+            control_path = os.path.expanduser(_external_control_path)
+        else:
+            control_path = f'{_ssh_control_path(ssh_control_name)}/%C'
         if escape_percent_expand:
             control_path = control_path.replace('%', '%%')
         arg_dict.update({
@@ -272,7 +284,7 @@ def ssh_options_list(
             # sky.launch().
             'ControlMaster': 'auto',
             'ControlPath': control_path,
-            'ControlPersist': '300s',
+            'ControlPersist': _control_persist,
         })
     ssh_key_option = [
         '-i',
