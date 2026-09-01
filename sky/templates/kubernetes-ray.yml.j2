@@ -626,6 +626,11 @@ available_node_types:
                   fi
           {% endif %}
           env:
+            # --- nemo-rl: expose status.podIP to the system Ray bootstrap ---
+            - name: SKYPILOT_RAY_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
             - name: SKYPILOT_POD_NODE_TYPE
               valueFrom:
                 fieldRef:
