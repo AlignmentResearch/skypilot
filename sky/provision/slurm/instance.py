@@ -200,7 +200,17 @@ def _wait_for_job_nodes(
     last_state = None
 
     while timeout < 0 or time.time() - start_time < timeout:
-        state = client.get_job_state(job_id)
+        # --- nemo-rl: transient slurmctld errors must not cancel a queued job ---
+        # A TRANSIENT slurmctld failure makes `squeue` exit non-zero, which raises
+        # CommandError. That must NOT abort the wait: the job is still PENDING. Letting it
+        # propagate tears the provision down and cancels the job.
+        try:
+            state = client.get_job_state(job_id)
+        except exceptions.CommandError as e:
+            logger.warning(f'Transient error polling Slurm job {job_id} state; '
+                           f'retrying (job remains queued): {e}')
+            time.sleep(5)
+            continue
 
         if state != last_state:
             logger.debug(f'Job {job_id} state: {state}')
@@ -228,7 +238,16 @@ def _wait_for_job_nodes(
                 logger.debug(f'Failed to get pending status for job '
                              f'{job_id}: {e}')
 
-        if client.check_job_has_nodes(job_id):
+        # --- nemo-rl: transient slurmctld guard (node poll) ---
+        # Same guard as the get_job_state poll above.
+        try:
+            has_nodes = client.check_job_has_nodes(job_id)
+        except exceptions.CommandError as e:
+            logger.warning(f'Transient error checking nodes for Slurm job {job_id}; '
+                           f'retrying (job remains queued): {e}')
+            time.sleep(5)
+            continue
+        if has_nodes:
             logger.debug(f'Job {job_id} has nodes allocated')
             return
 
