@@ -1673,6 +1673,14 @@ available_node_types:
               initContainers:
                 - name: init-copy-home
                   image: {{image_id}}
+                  # --- nemo-rl: resource requests for the HA home-copy init container ---
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 128Mi
+                    limits:
+                      cpu: 100m
+                      memory: 128Mi
                   command: ["/bin/sh", "-c"]
                   args:
                     - |
